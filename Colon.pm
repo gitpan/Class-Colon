@@ -1,11 +1,15 @@
 package Class::Colon;
 use strict; use warnings;
 
-our $VERSION = "0.02";
+our $VERSION = "0.03";
 
 =head1 NAME
 
-Class::Colon - Makes objects out of colon delimited records
+Class::Colon - Makes objects out of colon delimited records and vice versa
+
+=head1 VERSION
+
+This document covers version 0.03 of C<Class::Colon>.
 
 =head1 SYNOPSIS
 
@@ -27,6 +31,11 @@ Class::Colon - Makes objects out of colon delimited records
         print $address->city . ", " . $address->province . "\n";
         print $address->country, "\n" if $address->country;
     }
+    close ADDRESS_FILE;
+
+    my $sample_address = Address->OBJECTIFY(
+        "1313 Mocking Bird Ln:Adamstown:PA:12345:USA"
+    );  # convert one string to an object
 
     my $first_address = $addresses->[0]->STRINGIFY();
     # puts it back in delimited form
@@ -52,7 +61,7 @@ object, its entry should be of the form
     attribute_name=package_name=constructor_name
 
 as shown above for C<date_of_birth> which is of type C<Date> whose constructor
-is C<new>.  In above example, I could have omitted the constructor name, since
+is C<new>.  In that example, I could have omitted the constructor name, since
 C<new> is the default.
 
 You may objectify as many different record types as you like in one use
@@ -87,14 +96,20 @@ None, this is object oriented.
 =head1 METHODS
 
 There are currently only a few methods.  There are two class methods
-for reading (for each class you requested in your use Class::Colon statement).
-There is also a dual get/set accessor for each field.  Finally, there is a
-DELIM method which allows you to set the delimiter.  This can be any literal
-string, it applies to all fields in the file.
+for reading, READ_FILE and READ_HANDLE, (these work for every class you
+requested in your use Class::Colon statement).  There are corresponding
+class methods for writing, WRITE_FILE and WRITE_HANDLE.  If you want to handle
+the I/O manually (or maybe you don't need I/O), there are two methods to help,
+OBJECTIFY (takes a string returns an object) and STRINGIFY (the opposite).
+There is also a set of dual use accessors, one for each field in each class.
+You name these yourself in the use statement.  Finally, there is a DELIM
+method which allows you to set the delimiter.  This can be any literal string,
+it applies to all fields in the file.  There is a separate delimiter for
+each class.  It defaults to colon.
 
-You should consider every ALL_CAPS name reserved.  I plan to add methods in
-the future, their names will be ALL_CAPS, as the current method names are.
-Therefore, don't use ALL_CAPS for field names.
+You should consider every ALL_CAPS name reserved.  I reserve the right to
+add methods in the future, their names will be ALL_CAPS, as the current
+method names are.  Therefore, don't use ALL_CAPS for field names.
 
 In addition to retrieving the attributes through accessor methods, you
 could peek directly at the data.  It is stored in a hash so the following
@@ -107,12 +122,10 @@ and
     my $country = $address->{country};
 
 Using this fact might make some things neater in your code (like print
-statements).  It also saves a tiny amount of time.  Yet, our OO teachers
-will smack our hands, if they hear about this little arrangement.  I have no
-plans to change the implementation, but they tell me never to make such
-promises.
-
-At this point there are no output methods.  That may change in the future.
+statements).  It also saves a tiny amount of time.  Our OO teachers
+will smack our hands, if they hear about this little arrangement, so keep
+quite about it :-).  I have no plans to change the implementation, but
+they tell me never to make such promises.
 
 =cut
 
@@ -179,7 +192,8 @@ it a string.  For example, you could say
 
     Person->DELIM(';');
 
-to change the delimiter from colon to semi-colon for Person.
+this would change the delimiter from colon to semi-colon for Person.  No
+other classes would be affected.
 
 =cut
 
@@ -205,9 +219,10 @@ as the name you used to call the method.  Think of these as super constructors,
 instead of making one object at a time, they make as many as they can from
 your input.
 
-READ_FILE takes the name of a file, which it opens and reads.
+READ_FILE takes the name of a file, which it opens, reads, and closes.
 
-READ_HANDLE takes a handle open for reading.
+READ_HANDLE takes an open handle ready for reading.  You must ensure that the
+handle is properly opened and closed.
 
 =cut
 
@@ -263,15 +278,13 @@ Call these mehtods through one of the names you supplied in your use
 statement.
 
 Both WRITE_FILE and WRITE_HANDLE return an array reference with one element
-for each line in your input file.  All lines are represented even if they
-are blank or start with #.  The array elements are objects of the same type
-as the name you used to call the method.  Think of these as super constructors,
-instead of making one object at a time, they make as many as they can from
-your input.
+for each line in your input file.  The lines are made by joining the fields
+in the order they appeared in the use statement using the current DELIM.
 
-WRITE_FILE takes the name of a file, which it opens and writes.
+WRITE_FILE takes the name of a file, which it opens, writes, and closes.
 
-WRITE_HANDLE takes a handle open for writing.
+WRITE_HANDLE takes a handle open for writing.  You must ensure that the handle
+is properly opened and closed.
 
 =cut
 
@@ -322,7 +335,7 @@ sub stringify {
 =head2 accessors
 
 For each attribute you name in your use statement, there is a corresponding
-dual get/set accessor.  The names of the accessors are the same as the names
+dual use accessor.  The names of the accessors are the same as the names
 you used (how convenient).  You can also fish directly in the hash based
 object using the name of attribute as the key, but don't tell your OO
 instructor.
@@ -331,8 +344,10 @@ instructor.
 
 =head1 BUGS and OMISSIONS
 
-Quotes are not special.  If a colon (or the DELIM of your choice) is
-inside quotes, it still counts as a field separator.
+There is no quoting.  If a colon (or the DELIM of your choice) is
+quoted, it still counts as a field separator.
+
+Comments and blank lines are treated as regular records.
 
 =head1 AUTHOR
 
@@ -343,7 +358,7 @@ Phil Crow, E<lt>philcrow2000@yahoo.comE<gt>
 Copyright 2003 by Phil Crow, all rights reserved.
 
 This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself. 
+it under the same terms as Perl 5.8.1 itself. 
 
 =cut
 

@@ -1,5 +1,11 @@
 Revision history for Perl extension Class::Colon.
 
+0.03  Mon Nov 10 12:53:30 CST 2003
+        - Added Test::More to the prerequiste list in Makefile.PL.
+        - Added a test for direct attribute access like $obj->{first} to
+          t/01inmemory.t
+        - Corrected minor and glaring errors in the POD.
+
 0.02  Tue Oct  7 12:08:50 CDT 2003
         - Changed the name of the fabricated class constructor from new to NEW
           to comply with the uppercase name convetion.  I promise not to
