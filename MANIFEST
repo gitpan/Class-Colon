@@ -1,0 +1,10 @@
+Changes
+Colon.pm
+MANIFEST
+Makefile.PL
+README
+t/01inmemory.t
+t/02simpleread.t
+t/03ooread.t
+t/sample.dat
+t/comma.dat
