@@ -8,7 +8,7 @@ use Class::Colon Person => [ qw(first middle last dob) ];
 
 #________ Test the manufactured class Person ______
 
-my $tp = Person->new();
+my $tp = Person->NEW();
 isa_ok($tp, 'Person', "Person constructor");
 $tp->first("Howdy");
 $tp->last("Duty");

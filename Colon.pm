@@ -1,7 +1,7 @@
 package Class::Colon;
 use strict; use warnings;
 
-our $VERSION = "0.01";
+our $VERSION = "0.02";
 
 =head1 NAME
 
@@ -14,7 +14,7 @@ Class::Colon - Makes objects out of colon delimited records
         Person  => [ qw ( first middle family date_of_birth=Date=new ) ],
         Address => [ qw ( street city province code country          ) ];
 
-    Person->DELIM(qr/,/); # change from colon to comma for delimeter
+    Person->DELIM(','); # change from colon to comma for delimeter
     my $names = Person->READ_FILE($file_name);
     foreach my $name (@$names) {
         print $name->family, ",", $name->first, $name->middle, "\n";
@@ -25,16 +25,26 @@ Class::Colon - Makes objects out of colon delimited records
     foreach my $address (@$addresses) {
         print $address->street . "\n"
         print $address->city . ", " . $address->province . "\n";
-        print $address->country, "\n" if defined $address->country;
+        print $address->country, "\n" if $address->country;
     }
+
+    my $first_address = $addresses->[0]->STRINGIFY();
+    # puts it back in delimited form
+
+    Address->WRITE_FILE("output.dat", $addresses);
+    
+    open ADDRESS_FILE, ">newaddr.dat" or die "...\n";
+    Address->WRITE_HANDLE(*ADDRESS_FILE, $addresses);
+    close ADDRESS_FILE;
 
 =head1 DESCRIPTION
 
 To turn your colon delimited file into a list of objects, use C<Class::Colon>,
-giving it the name you want to use for the class and a list of column names
-which will become attributes of the objects in the class.  List the names
-in the order they appear in the input.  Missing fields will be set to undef.
-Extra fields will be ignored.  Use lower case names for the fields.
+giving it the name you want to use for the class and an anonymous array of
+column names which will become attributes of the objects in the class.  List
+the names in the order they appear in the input.  Missing fields will be set
+to "".  Extra fields will be ignored.  Use lower case names for the fields.
+Upper case names are reserved for use as methods of the class.
 
 Most fields will be simple scalars, but if one of the fields should be an
 object, its entry should be of the form
@@ -59,12 +69,16 @@ as in:
 You wouldn't have to use the double colon, but it makes sense to me.
 
 If your delimiter is not colon, call DELIM on I<your> class I<before> calling
-C<READ_FILE>.  Pass it a pattern in the form qr/$your_delim_here/.  It
-must be a regular expression, using qr is the easiest way to make that happen.
+C<READ_*>.  Pass it as a string.  It can be any length, but is taken
+literally.
+
+Feel free to add code to the generated package(s) before or after using
+Class::Colon.  But, keep in mind possible name conflicts.  As pointed out
+below (under METHODS), all ALL_CAPS names are reserved.
 
 =head1 ABSTRACT
 
-  This module objectifies colon separated data files into objects.
+  This module turns colon separated data files into lists of objects.
 
 =head2 EXPORT
 
@@ -72,14 +86,15 @@ None, this is object oriented.
 
 =head1 METHODS
 
-There are currently only a few methods.  There is one class method C<READ_FILE>
-(for each key in the hash you passed to use).  There is also a dual
-get/set accessor for each field.  Finally, there is a DELIM method which
-allows you to set the delimiter.  This can be any valid pattern (regex),
-but it applies to all fields in the file.  You may not use DELIM
-as the name of one of your fields.  In fact, you should consider every
-ALL_CAPS name reserved.  I may use those to support other configurations
-in the future.
+There are currently only a few methods.  There are two class methods
+for reading (for each class you requested in your use Class::Colon statement).
+There is also a dual get/set accessor for each field.  Finally, there is a
+DELIM method which allows you to set the delimiter.  This can be any literal
+string, it applies to all fields in the file.
+
+You should consider every ALL_CAPS name reserved.  I plan to add methods in
+the future, their names will be ALL_CAPS, as the current method names are.
+Therefore, don't use ALL_CAPS for field names.
 
 In addition to retrieving the attributes through accessor methods, you
 could peek directly at the data.  It is stored in a hash so the following
@@ -92,7 +107,7 @@ and
     my $country = $address->{country};
 
 Using this fact might make some things neater in your code (like print
-statements.  It also saves a tiny amount of time.  Yet, our OO teachers
+statements).  It also saves a tiny amount of time.  Yet, our OO teachers
 will smack our hands, if they hear about this little arrangement.  I have no
 plans to change the implementation, but they tell me never to make such
 promises.
@@ -111,11 +126,16 @@ sub import {
 
     foreach my $fake (keys %fakes) {
         no strict;
-#        *{"$fake\::READ_FILE"} = $class->can("read_file");
-        *{"$fake\::new"}         = sub { return bless {}, shift; };
-        *{"$fake\::READ_FILE"}   = \&{"$class\::read_file"};
-        *{"$fake\::READ_HANDLE"} = \&{"$class\::read_handle"};
-        *{"$fake\::DELIM"}       = \&{"$class\::DELIM"};
+        *{"$fake\::NEW"}     = sub { return bless {}, shift; };
+
+        foreach my $proxy_method qw(
+            read_file  read_handle  objectify delim
+            write_file write_handle stringify
+        ) {
+            my $proxy_name   = "$fake"  . "::" . uc $proxy_method;
+            my $real_name    = "$class" . "::" .    $proxy_method;
+            *{"$proxy_name"} = \&{"$real_name"};
+        }
 
         my @attributes;
         foreach my $col (@{$fakes{$fake}}) {
@@ -123,7 +143,7 @@ sub import {
             *{"$fake\::$name"} = _make_accessor($name, $type, $constructor);
             push @attributes, $name;
         }
-        $simulated_classes{$fake} = {ATTRS => \@attributes, DELIM => qr/:/};
+        $simulated_classes{$fake} = {ATTRS => \@attributes, DELIM => ':'};
     }
 }
 
@@ -155,20 +175,20 @@ sub _make_accessor {
 =head2 DELIM
 
 Call this through one of the names you supplied in your use statement.  Pass
-it a pattern in the form qr/$delim/.  For example, you could say
+it a string.  For example, you could say
 
-    Person->DELIM(qr/;/);
+    Person->DELIM(';');
 
 to change the delimiter from colon to semi-colon for Person.
 
 =cut
 
-sub DELIM {
+sub delim {
     my $fake_class = shift;
-    my $pattern    = shift;
+    my $string     = shift;
 
-    if (defined $pattern) {
-        $simulated_classes{$fake_class}{DELIM} = $pattern;
+    if (defined $string) {
+        $simulated_classes{$fake_class}{DELIM} = $string;
     }
     return $simulated_classes{$fake_class}{DELIM};
 }
@@ -203,34 +223,113 @@ sub read_file {
 }
 
 sub read_handle {
-    my $class    = shift;
-    my $handle   = shift;
-    my $config   = $simulated_classes{$class};
-    my $col_list = $config->{ATTRS};
+    my $class  = shift;
+    my $handle = shift;
 
     my @rows;
     while (<$handle>) {
         chomp;
-        my $new_object = $class->new();
-        my @cols       = split $config->{DELIM};
-        foreach my $i (0 .. @cols - 1) {
-            my $method = $col_list->[$i];
-            $new_object->$method($cols[$i]);
-        }
-        push @rows, $new_object;
+        push @rows, $class->OBJECTIFY($_);
     }
     return \@rows;
+}
+
+=head2 OBJECTIFY
+
+If you want to control the read loop for your data, this method is here
+to help you.  Call it through a class name.  Pass it one line (chomp it
+yourself).  Receive one object.
+
+=cut
+
+sub objectify {
+    my $class    = shift;
+    my $string   = shift;
+    my $config   = $simulated_classes{$class};
+    my $col_list = $config->{ATTRS};
+
+    my $new_object = $class->NEW();
+    my @cols       = split /$config->{DELIM}/, $string;
+    foreach my $i (0 .. @cols - 1) {
+        my $method = $col_list->[$i];
+        $new_object->$method($cols[$i]);
+    }
+    return $new_object;
+}
+
+=head2 WRITE_FILE and WRITE_HANDLE
+
+Call these mehtods through one of the names you supplied in your use
+statement.
+
+Both WRITE_FILE and WRITE_HANDLE return an array reference with one element
+for each line in your input file.  All lines are represented even if they
+are blank or start with #.  The array elements are objects of the same type
+as the name you used to call the method.  Think of these as super constructors,
+instead of making one object at a time, they make as many as they can from
+your input.
+
+WRITE_FILE takes the name of a file, which it opens and writes.
+
+WRITE_HANDLE takes a handle open for writing.
+
+=cut
+
+sub write_file {
+    my $class    = shift;
+    my $file     = shift;
+
+    open FILE,   ">$file" or croak "Couldn't write $file: $!";
+    my $retval   = $class->WRITE_HANDLE(*FILE, @_);
+    close FILE;
+
+    return $retval;
+}
+
+sub write_handle {
+    my $class  = shift;
+    my $handle = shift;
+    my $rows   = shift;
+
+    foreach my $row (@$rows) {
+        print $handle $row->STRINGIFY() . "\n";
+    }
+}
+
+=head2 STRINGIFY
+
+Call this through an object you got by using Class::Colon.  Receive
+a colon delimited string suitable for writing back to your file.  The
+string comes with no newline, unless the last field happens to have one.
+You may need to supply a newline, especially if you chomped.
+
+=cut
+
+sub stringify {
+    my $self     = shift;
+    my $type     = ref($self);
+    my $config   = $simulated_classes{$type};
+    my $col_list = $config->{ATTRS};
+    my $retval;
+
+    my @fields;
+    foreach my $att (@$col_list) {
+        push @fields, $self->{$att};
+    }
+    return join $config->{DELIM}, @fields;
 }
 
 =head2 accessors
 
 For each attribute you name in your use statement, there is a corresponding
 dual get/set accessor.  The names of the accessors are the same as the names
-you used (how convenient).
+you used (how convenient).  You can also fish directly in the hash based
+object using the name of attribute as the key, but don't tell your OO
+instructor.
+
+=cut
 
 =head1 BUGS and OMISSIONS
-
-There are no output methods.
 
 Quotes are not special.  If a colon (or the DELIM of your choice) is
 inside quotes, it still counts as a field separator.

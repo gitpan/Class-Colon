@@ -12,14 +12,14 @@ my $real_people = [
 bless( {
         'dob' => bless( { 'DATA' => '05/03/1968' }, 'Date' ),
         'middle' => 'David',
-        'first' => 'Crow',
-        'last' => 'Phil'
+        'first' => 'Phil',
+        'last' => 'Crow'
         }, 'Person' ),
 bless( {
         'dob' => bless( { 'DATA' => '04/23/1976' }, 'Date' ),
         'middle' => 'Diane',
-        'first' => 'Crow',
-        'last' => 'Lisa'
+        'first' => 'Lisa',
+        'last' => 'Crow'
         }, 'Person' )
 ];
 
